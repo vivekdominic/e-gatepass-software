@@ -1,17 +1,15 @@
-# Start with a base Java image containing the necessary runtime environment (JDK 17)
-FROM openjdk:17-jdk-slim
-
-# Set the working directory inside the container
+# Stage 1: Build the application using Maven
+FROM maven:3.8-openjdk-17 AS build
 WORKDIR /app
+COPY .mvn/ .mvn
+COPY mvnw pom.xml ./
+RUN ./mvnw dependency:go-offline
+COPY src ./src
+RUN ./mvnw clean package -DskipTests
 
-# Copy the built JAR file from the target directory into the container's app directory.
-# The name MUST exactly match the file you built: gatepass-system-0.0.1-SNAPSHOT.jar
-# This creates a file named 'app.jar' inside the container.
-COPY target/gatepass-system-0.0.1-SNAPSHOT.jar app.jar
-
-# Command to run the application when the container starts
-# The jar file runs on the default Spring Boot port 8080
-ENTRYPOINT ["java", "-jar", "app.jar"]
-
-# Expose the port Spring Boot runs on (optional, but good practice)
+# Stage 2: Create the final lightweight image
+FROM openjdk:17-jdk-slim
+WORKDIR /app
+COPY --from=build /app/target/gatepass-system-0.0.1-SNAPSHOT.jar app.jar
 EXPOSE 8080
+ENTRYPOINT ["java", "-jar", "app.jar"]
